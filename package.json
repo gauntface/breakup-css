@@ -1,0 +1,19 @@
+{
+  "name": "breakup-css",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gauntface/breakup-css.git"
+  },
+  "dependencies": {
+    "css-tree": "^2.2.1",
+    "dracula-ui": "^1.0.3",
+    "meow": "^11.0.0"
+  },
+  "type": "module"
+}
