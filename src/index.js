@@ -1,6 +1,6 @@
 import * as csstree from 'css-tree';
 import meow from 'meow';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import * as path from 'path';
 
 const cli = meow({
@@ -59,10 +59,11 @@ async function run() {
       }
     }
 
-    const selector = csstree.find(c, (node, item, list) => {
-      return node.type == 'ClassSelector' || node.type == 'PseudoClassSelector' || node.type == 'TypeSelector';
+    const selectors = csstree.findAll(c, (node, item, list) => {
+      // return node.type == 'ClassSelector' || node.type == 'PseudoClassSelector' || node.type == 'TypeSelector';
+      return node.type == 'Selector';
     });
-    if (!selector) {
+    if (!selectors) {
       console.warn('--------------------------------------------------');
       console.warn(`Unexpected rule: `, csstree.generate(c));
       csstree.walk(c, (node) => {
@@ -74,15 +75,32 @@ async function run() {
       continue;
     }
 
-    let filename = selector.name;
-    if (filename == 'root') {
-      filename = '_variables';
+    const selectorsToUse = {};
+    for (const s of selectors) {
+      const selectorName = csstree.find(s, (node) => {
+        return node.type == 'ClassSelector' || node.type == 'TypeSelector' || (node.type == 'PseudoClassSelector' && node.name == 'root');
+      });
+      if (!selectorName) {
+        continue;
+      }
+      selectorsToUse[selectorName.name] = true;
     }
 
-    if (!files[filename]) {
-      files[filename] = [];
+    for (const selector of Object.keys(selectorsToUse)) {
+      let filename = selector;
+      if (filename == 'root') {
+        filename = path.join('variables', '_vars');
+      }
+
+      if (filename.indexOf('\\--') != -1) {
+        filename = filename.replaceAll('\\--', '--');
+      }
+
+      if (!files[filename]) {
+        files[filename] = [];
+      }
+      files[filename].push(c);
     }
-    files[filename].push(c);
   }
 
   const keyframeNames = Object.keys(keyframes);
@@ -92,20 +110,22 @@ async function run() {
     for (const r of rules) {
       strings.push(csstree.generate(r));
 
-      if (filename == 'drac-bg-animated') {
-        csstree.walk(r, (node, item, list) => {
-          if (node.type == 'Identifier') {
-            const name = node.name;
-            if(keyframeNames.indexOf(name) != -1) {
-              strings.push(csstree.generate(keyframes[name]));
-            }
+      // Add keyframes if necessary
+      csstree.walk(r, (node, item, list) => {
+        if (node.type == 'Identifier') {
+          const name = node.name;
+          if(keyframeNames.indexOf(name) != -1) {
+            strings.push(csstree.generate(keyframes[name]));
           }
-          return false
-        });
-      }
+        }
+        return false
+      });
     }
 
     const fp = path.join(cli.flags.outputdir, `${filename}.css`);
+
+    await mkdir(path.dirname(fp), {recursive: true});
+
     await writeFile(fp, strings.join("\n"));
   }
 }
